@@ -1,8 +1,4 @@
-// Register File (RegFile)
-// - 32 registers of 32-bit width.
-// - x0 is hardwired to 0 (reads return 0, writes are ignored).
-// - Read ports (rs1, rs2) are read asynchronously.
-// - Write port (rd) updates on the rising clock edge when we (write-enable) is high.
+// Register File with Internal Write-to-Read Bypassing (Write-First)
 module regfile (
     input wire clk,
     input wire we,                  // write enable
@@ -15,11 +11,16 @@ module regfile (
 );
     reg [31:0] registers [0:31];
 
-    // Asynchronous reads: if address is 0, return 0; else return register value
-    assign rdata1 = (raddr1 == 5'b0) ? 32'b0 : registers[raddr1];
-    assign rdata2 = (raddr2 == 5'b0) ? 32'b0 : registers[raddr2];
+    // Asynchronous reads with internal bypassing:
+    // If we are currently writing to the same register we are reading (and it's not x0),
+    // output the write data (wdata) immediately instead of the stale register value.
+    assign rdata1 = (we && (waddr == raddr1) && (raddr1 != 5'b0)) ? wdata : 
+                    ((raddr1 == 5'b0) ? 32'b0 : registers[raddr1]);
 
-    // Initialize all registers to 0 for a clean simulation startup
+    assign rdata2 = (we && (waddr == raddr2) && (raddr2 != 5'b0)) ? wdata : 
+                    ((raddr2 == 5'b0) ? 32'b0 : registers[raddr2]);
+
+    // Initialize all registers to 0
     integer i;
     initial begin
         for (i = 0; i < 32; i = i + 1) begin
@@ -27,7 +28,7 @@ module regfile (
         end
     end
 
-    // Synchronous write: occurs on rising edge of clk if enabled, ignoring x0
+    // Synchronous write
     always @(posedge clk) begin
         if (we && (waddr != 5'b0)) begin
             registers[waddr] <= wdata;
