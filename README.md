@@ -1,6 +1,3 @@
-Ah, you missed the last part of the `README.md` file! Here is the **entire, complete** file from start to finish. Make sure to copy the whole block:
-
-```markdown
 # 5-Stage Hazard-Aware RV32I-Lite Pipelined CPU Core
 
 A portfolio-ready, synthesizable 32-bit RISC-V pipelined processor core implementing the RV32I-Lite instruction subset. This core features full hazard resolution (bypassing, stalling, and flushes) and is verified against a Python Golden Model reference.
@@ -32,42 +29,4 @@ A portfolio-ready, synthesizable 32-bit RISC-V pipelined processor core implemen
 ---
 
 ## 🧪 Verification Methodology
-This core is verified using an automated **Python Co-Simulation Diff Harness**. 
-
-```
- [ Assembly Hex ] ──┬──► [ Python Golden ISA Model ] ──► [ Py Register Log ]
-                    │                                          │
-                    ▼                                          ▼
-             [ RTL Core (iverilog) ] ─────────────────► [ RTL Register Log ] ──► [ Diff Script ]
-```
-
-1. **Self-Directed Tests**: Direct hazards tested on custom dependent sequences to confirm exact stalling and bypassing cycles.
-2. **Loop/Control Tests**: Loop program counting from 5 to 0 executed to verify control flushes, branch redirection, and register file writing.
-3. **Golden Model Comparisons**: The register logs from the Verilog gate-level state dump are compared side-by-side with the Python Golden Model output at execution termination.
-
-To run the automated verification suite:
-```bash
-python3 verify.py
-```
-
----
-
-## 📊 Synthesis & Resource Utilization (Yosys)
-Synthesis was performed using the open-source Yosys compiler to verify that the Verilog code is fully synthesizable and free of latches.
-
-* **Top Module**: `cpu`
-* **Total Synthesized Gates**: 10,122 cells
-  * `MUX cells`: 4,337
-  * `DFF cells (Registers)`: 3,586
-  * `Logic gates`: 2,199
-* **Linting / DRC**: `CHECK pass: Found and reported 0 problems` (Zero combinatorial feedback loops, zero latches, timing-clean).
-
----
-
-## 🔬 Critical Path STA (Static Timing Analysis)
-Using Yosys's `ltp` topological path analyzer, the physical critical path was isolated within the **Execute stage**:
-* **Start**: Output of `id_ex_reg` (holding current operands).
-* **Path**: Forwarding Multiplexers -> ALU Operand Mux -> 32-bit ALU Carry Chain.
-* **End**: Setup of the `ex_mem_reg` register.
-* **Optimization Potential**: To target higher frequencies, the 32-bit carry chain can be pipelined or branch target resolution can be moved to the Decode stage.
-```
+This core is verified using an automated **Python Co-Simulation Diff Harness**.
