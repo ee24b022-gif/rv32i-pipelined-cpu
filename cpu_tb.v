@@ -11,7 +11,6 @@ module cpu_tb;
     wire [4:0] write_reg;
     wire reg_write;
 
-    // Instantiate CPU Top
     cpu uut (
         .clk(clk),
         .rst(rst),
@@ -29,41 +28,32 @@ module cpu_tb;
         $dumpfile("cpu_tb.vcd");
         $dumpvars(0, cpu_tb);
 
-        $display("Starting Pipelined CPU Skeleton Testbench...");
+        $display("Starting Pipelined CPU Loop / Branch Flush Testbench...");
         clk = 0;
         rst = 1;
         
         #12;
         rst = 0;
 
-        $display("Cycle | PC       | RegWrite | WriteReg | WriteData  | ALU Result");
-        $display("----------------------------------------------------------------");
-
-        // Run for 24 cycles to execute the entire program through all pipeline stages
-        repeat (24) begin
+        // Run for 55 cycles to allow the loop to run 5 times and terminate
+        repeat (55) begin
             @(posedge clk); #1;
-            $display("%5d | 32'h%h | %b        | 5'd%2d    | 32'h%h | 32'h%h",
-                     $time/10, pc, reg_write, write_reg, write_data, alu_result);
         end
 
         // Assert register values
-        $display("\nVerifying Registers after execution:");
-        $display("x1 (expect 10)  = %0d", uut.regfile_inst.registers[1]);
-        $display("x2 (expect 20)  = %0d", uut.regfile_inst.registers[2]);
-        $display("x3 (expect 30)  = %0d", uut.regfile_inst.registers[3]);
-        $display("x9 (expect 30)  = %0d", uut.regfile_inst.registers[9]);
+        $display("\nVerifying Registers after Loop Execution:");
+        $display("x1 (expect 0)   = %0d (loop counter decremented to 0)", uut.regfile_inst.registers[1]);
+        $display("x2 (expect 1)   = %0d", uut.regfile_inst.registers[2]);
+        $display("x3 (expect 15)  = %0d (sum of 5+4+3+2+1)", uut.regfile_inst.registers[3]);
+        $display("x4 (expect 100) = %0d (loop exit success)", uut.regfile_inst.registers[4]);
 
-        $display("\nVerifying Data Memory:");
-        $display("dmem[8] (expect 30) = %0d", uut.dmem_inst.ram[2]); // word index 2 is byte index 8
-
-        if (uut.regfile_inst.registers[1] == 10 &&
-            uut.regfile_inst.registers[2] == 20 &&
-            uut.regfile_inst.registers[3] == 30 &&
-            uut.regfile_inst.registers[9] == 30 &&
-            uut.dmem_inst.ram[2] == 30) begin
-            $display("\nPIPELINE SKELETON VERIFICATION PASSED! 🎉");
+        if (uut.regfile_inst.registers[1] == 0 &&
+            uut.regfile_inst.registers[2] == 1 &&
+            uut.regfile_inst.registers[3] == 15 &&
+            uut.regfile_inst.registers[4] == 100) begin
+            $display("\nLOOP AND BRANCH FLUSH VERIFICATION PASSED! 🎉");
         end else begin
-            $display("\nPIPELINE SKELETON VERIFICATION FAILED! ❌");
+            $display("\nLOOP AND BRANCH FLUSH VERIFICATION FAILED! ❌");
         end
         $finish;
     end
