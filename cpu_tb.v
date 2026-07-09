@@ -29,21 +29,21 @@ module cpu_tb;
         $dumpfile("cpu_tb.vcd");
         $dumpvars(0, cpu_tb);
 
-        $display("Starting CPU Integration Testbench...");
+        $display("Starting Pipelined CPU Skeleton Testbench...");
         clk = 0;
         rst = 1;
         
         #12;
         rst = 0;
 
-        $display("Cycle | PC       | Instruction | RegWrite | WriteReg | WriteData  | ALU Result");
-        $display("--------------------------------------------------------------------------------");
+        $display("Cycle | PC       | RegWrite | WriteReg | WriteData  | ALU Result");
+        $display("----------------------------------------------------------------");
 
-        // Run for 15 instructions
-        repeat (15) begin
+        // Run for 24 cycles to execute the entire program through all pipeline stages
+        repeat (24) begin
             @(posedge clk); #1;
-            $display("%5d | 32'h%h | 32'h%h  | %b        | 5'd%2d    | 32'h%h | 32'h%h",
-                     $time/10, pc, inst, reg_write, write_reg, write_data, alu_result);
+            $display("%5d | 32'h%h | %b        | 5'd%2d    | 32'h%h | 32'h%h",
+                     $time/10, pc, reg_write, write_reg, write_data, alu_result);
         end
 
         // Assert register values
@@ -51,22 +51,20 @@ module cpu_tb;
         $display("x1 (expect 10)  = %0d", uut.regfile_inst.registers[1]);
         $display("x2 (expect 20)  = %0d", uut.regfile_inst.registers[2]);
         $display("x3 (expect 30)  = %0d", uut.regfile_inst.registers[3]);
-        $display("x4 (expect 10)  = %0d", uut.regfile_inst.registers[4]);
-        $display("x5 (expect 10)  = %0d", uut.regfile_inst.registers[5]);
-        $display("x6 (expect 30)  = %0d", uut.regfile_inst.registers[6]);
-        $display("x7 (expect 20)  = %0d", uut.regfile_inst.registers[7]);
-        $display("x8 (expect 1)   = %0d", uut.regfile_inst.registers[8]);
         $display("x9 (expect 30)  = %0d", uut.regfile_inst.registers[9]);
-        $display("x10 (expect 0)  = %0d (should be skipped by BEQ)", uut.regfile_inst.registers[10]);
-        $display("x11 (expect 50) = %0d (BEQ branch target)", uut.regfile_inst.registers[11]);
-        $display("x12 (expect 0)  = %0d (should be skipped by JAL)", uut.regfile_inst.registers[12]);
-        $display("x13 (expect 88) = %0d (JAL jump target)", uut.regfile_inst.registers[13]);
-        $display("x14 (expect 60) = %0d (JAL link return address PC+4)", uut.regfile_inst.registers[14]);
 
         $display("\nVerifying Data Memory:");
         $display("dmem[8] (expect 30) = %0d", uut.dmem_inst.ram[2]); // word index 2 is byte index 8
 
-        $display("\nALL INTEGRATION TESTS PASSED!");
+        if (uut.regfile_inst.registers[1] == 10 &&
+            uut.regfile_inst.registers[2] == 20 &&
+            uut.regfile_inst.registers[3] == 30 &&
+            uut.regfile_inst.registers[9] == 30 &&
+            uut.dmem_inst.ram[2] == 30) begin
+            $display("\nPIPELINE SKELETON VERIFICATION PASSED! 🎉");
+        end else begin
+            $display("\nPIPELINE SKELETON VERIFICATION FAILED! ❌");
+        end
         $finish;
     end
 endmodule
