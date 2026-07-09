@@ -1,0 +1,73 @@
+#! /usr/bin/vvp
+:ivl_version "12.0 (stable)";
+:ivl_delay_selection "TYPICAL";
+:vpi_time_precision - 12;
+:vpi_module "/usr/lib/x86_64-linux-gnu/ivl/system.vpi";
+:vpi_module "/usr/lib/x86_64-linux-gnu/ivl/vhdl_sys.vpi";
+:vpi_module "/usr/lib/x86_64-linux-gnu/ivl/vhdl_textio.vpi";
+:vpi_module "/usr/lib/x86_64-linux-gnu/ivl/v2005_math.vpi";
+:vpi_module "/usr/lib/x86_64-linux-gnu/ivl/va_math.vpi";
+S_0x64f874533020 .scope module, "imem_tb" "imem_tb" 2 3;
+ .timescale -9 -12;
+v0x64f874559170_0 .var "addr", 31 0;
+v0x64f874559230_0 .net "rdata", 31 0, L_0x64f8745698b0;  1 drivers
+S_0x64f874542270 .scope module, "uut" "imem" 2 8, 3 4 0, S_0x64f874533020;
+ .timescale 0 0;
+    .port_info 0 /INPUT 32 "addr";
+    .port_info 1 /OUTPUT 32 "rdata";
+v0x64f874542450_0 .net *"_ivl_1", 23 0, L_0x64f874559300;  1 drivers
+v0x64f874558860_0 .net *"_ivl_10", 7 0, L_0x64f874569720;  1 drivers
+L_0x76fdb45a5060 .functor BUFT 1, C4<00>, C4<0>, C4<0>, C4<0>;
+v0x64f874558940_0 .net *"_ivl_13", 1 0, L_0x76fdb45a5060;  1 drivers
+L_0x76fdb45a50a8 .functor BUFT 1, C4<00000000000000000000000000000000>, C4<0>, C4<0>, C4<0>;
+v0x64f874558a00_0 .net/2u *"_ivl_14", 31 0, L_0x76fdb45a50a8;  1 drivers
+L_0x76fdb45a5018 .functor BUFT 1, C4<000000000000000000000000>, C4<0>, C4<0>, C4<0>;
+v0x64f874558ae0_0 .net/2u *"_ivl_2", 23 0, L_0x76fdb45a5018;  1 drivers
+v0x64f874558c10_0 .net *"_ivl_4", 0 0, L_0x64f874569410;  1 drivers
+v0x64f874558cd0_0 .net *"_ivl_6", 31 0, L_0x64f874569580;  1 drivers
+v0x64f874558db0_0 .net *"_ivl_9", 5 0, L_0x64f874569620;  1 drivers
+v0x64f874558e90_0 .net "addr", 31 0, v0x64f874559170_0;  1 drivers
+v0x64f874558f70_0 .net "rdata", 31 0, L_0x64f8745698b0;  alias, 1 drivers
+v0x64f874559050 .array "rom", 63 0, 31 0;
+L_0x64f874559300 .part v0x64f874559170_0, 8, 24;
+L_0x64f874569410 .cmp/eq 24, L_0x64f874559300, L_0x76fdb45a5018;
+L_0x64f874569580 .array/port v0x64f874559050, L_0x64f874569720;
+L_0x64f874569620 .part v0x64f874559170_0, 2, 6;
+L_0x64f874569720 .concat [ 6 2 0 0], L_0x64f874569620, L_0x76fdb45a5060;
+L_0x64f8745698b0 .functor MUXZ 32, L_0x76fdb45a50a8, L_0x64f874569580, L_0x64f874569410, C4<>;
+    .scope S_0x64f874542270;
+T_0 ;
+    %vpi_call 3 12 "$readmemh", "imem.hex", v0x64f874559050 {0 0 0};
+    %end;
+    .thread T_0;
+    .scope S_0x64f874533020;
+T_1 ;
+    %vpi_call 2 14 "$dumpfile", "imem_tb.vcd" {0 0 0};
+    %vpi_call 2 15 "$dumpvars", 32'sb00000000000000000000000000000000, S_0x64f874533020 {0 0 0};
+    %vpi_call 2 17 "$display", "Starting Instruction Memory testbench..." {0 0 0};
+    %pushi/vec4 0, 0, 32;
+    %store/vec4 v0x64f874559170_0, 0, 32;
+    %delay 10000, 0;
+    %vpi_call 2 22 "$display", "Addr %0d: rdata = %h (expect DEADBEEF)", v0x64f874559170_0, v0x64f874559230_0 {0 0 0};
+    %pushi/vec4 4, 0, 32;
+    %store/vec4 v0x64f874559170_0, 0, 32;
+    %delay 10000, 0;
+    %vpi_call 2 27 "$display", "Addr %0d: rdata = %h (expect CAFEBABE)", v0x64f874559170_0, v0x64f874559230_0 {0 0 0};
+    %pushi/vec4 1, 0, 32;
+    %store/vec4 v0x64f874559170_0, 0, 32;
+    %delay 10000, 0;
+    %vpi_call 2 32 "$display", "Addr %0d (unaligned): rdata = %h (expect DEADBEEF)", v0x64f874559170_0, v0x64f874559230_0 {0 0 0};
+    %pushi/vec4 256, 0, 32;
+    %store/vec4 v0x64f874559170_0, 0, 32;
+    %delay 10000, 0;
+    %vpi_call 2 37 "$display", "Addr %0d (out of bounds): rdata = %h (expect 00000000)", v0x64f874559170_0, v0x64f874559230_0 {0 0 0};
+    %vpi_call 2 39 "$display", "IMEM testbench complete." {0 0 0};
+    %vpi_call 2 40 "$finish" {0 0 0};
+    %end;
+    .thread T_1;
+# The file index is used to find the file name in the following table.
+:file_names 4;
+    "N/A";
+    "<interactive>";
+    "imem_tb.v";
+    "imem.v";
