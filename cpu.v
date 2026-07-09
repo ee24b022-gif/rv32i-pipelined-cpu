@@ -38,8 +38,10 @@ module cpu (
     // =========================================================================
     wire [31:0] pc_D, inst_D;
     
-    if_id_reg if_id (
+        if_id_reg if_id (
         .clk(clk), .rst(rst),
+        .stall_D(1'b0),          // Tied to 0 for now (no stall)
+        .flush_D(1'b0),          // Tied to 0 for now (no flush)
         .pc_in(pc_out), .inst_in(inst_F),
         .pc_out(pc_D), .inst_out(inst_D)
     );
@@ -96,8 +98,9 @@ module cpu (
     wire [2:0] funct3_E;
     wire [6:0] funct7_E, opcode_E;
 
-    id_ex_reg id_ex (
+        id_ex_reg id_ex (
         .clk(clk), .rst(rst),
+        .flush_E(1'b0),          // Tied to 0 for now (no flush)
         .reg_write_in(reg_write_D), .mem_to_reg_in(mem_to_reg_D),
         .mem_read_in(mem_read_D), .mem_write_in(mem_write_D),
         .branch_in(branch_D), .jump_in(jump_D),
