@@ -24,37 +24,31 @@ module cpu_tb;
 
     always #5 clk = ~clk;
 
+    integer i;
+
     initial begin
         $dumpfile("cpu_tb.vcd");
         $dumpvars(0, cpu_tb);
 
-        $display("Starting Pipelined CPU Loop / Branch Flush Testbench...");
         clk = 0;
         rst = 1;
         
         #12;
         rst = 0;
 
-        // Run for 55 cycles to allow the loop to run 5 times and terminate
+        // Run for 55 cycles to drain the program fully
         repeat (55) begin
             @(posedge clk); #1;
         end
 
-        // Assert register values
-        $display("\nVerifying Registers after Loop Execution:");
-        $display("x1 (expect 0)   = %0d (loop counter decremented to 0)", uut.regfile_inst.registers[1]);
-        $display("x2 (expect 1)   = %0d", uut.regfile_inst.registers[2]);
-        $display("x3 (expect 15)  = %0d (sum of 5+4+3+2+1)", uut.regfile_inst.registers[3]);
-        $display("x4 (expect 100) = %0d (loop exit success)", uut.regfile_inst.registers[4]);
-
-        if (uut.regfile_inst.registers[1] == 0 &&
-            uut.regfile_inst.registers[2] == 1 &&
-            uut.regfile_inst.registers[3] == 15 &&
-            uut.regfile_inst.registers[4] == 100) begin
-            $display("\nLOOP AND BRANCH FLUSH VERIFICATION PASSED! 🎉");
-        end else begin
-            $display("\nLOOP AND BRANCH FLUSH VERIFICATION FAILED! ❌");
+        // Dump registers for Python verification
+        $display("\n--- REGISTER DUMP ---");
+        for (i = 0; i < 32; i = i + 1) begin
+            $display("x%0d = %0d", i, uut.regfile_inst.registers[i]);
         end
+        $display("--- MEMORY DUMP ---");
+        $display("dmem[8] = %0d", uut.dmem_inst.ram[2]);
+
         $finish;
     end
 endmodule

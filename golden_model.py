@@ -1,15 +1,11 @@
-# Simple RISC-V RV32I-lite Python Golden Model Reference
-# Mimics CPU instruction-by-instruction execution to generate reference register values.
-
+# Complete RISC-V RV32I-lite Python Golden Model Reference (Day 9)
 def to_signed(val, bits=32):
-    """Converts an unsigned integer into a signed integer for signed comparisons."""
     val = val & ((1 << bits) - 1)
     if val >= (1 << (bits - 1)):
         return val - (1 << bits)
     return val
 
 def run_simulation(hex_file):
-    # Initialize 32 registers to 0, and data memory dictionary
     regs = [0] * 32
     mem = {}
     
@@ -18,92 +14,111 @@ def run_simulation(hex_file):
         instructions = [line.strip() for line in f if line.strip()]
         
     pc = 0
-    cycle = 0
+    instructions_executed = 0
+    limit = 1000 # Safety limit to prevent infinite loops
     
-    # Run the simulation loop
-    while pc // 4 < len(instructions):
+    while pc // 4 < len(instructions) and instructions_executed < limit:
         hex_inst = instructions[pc // 4]
         inst = int(hex_inst, 16)
         
-        # If instruction is 0, treat it as NOP and move forward
+        # NOP
         if inst == 0:
             pc += 4
+            instructions_executed += 1
             continue
             
-        # Decode standard RISC-V fields
-        opcode   = inst & 0x7F
-        rd       = (inst >> 7) & 0x1F
-        funct3   = (inst >> 12) & 0x07
-        rs1      = (inst >> 15) & 0x1F
-        rs2      = (inst >> 20) & 0x1F
-        funct7   = (inst >> 25) & 0x7F
+        opcode = inst & 0x7F
+        rd = (inst >> 7) & 0x1F
+        funct3 = (inst >> 12) & 0x07
+        rs1 = (inst >> 15) & 0x1F
+        rs2 = (inst >> 20) & 0x1F
+        funct7 = (inst >> 25) & 0x7F
         
-        # Extract and sign-extend I-type immediate
+        # Decode Immediates
+        # I-type
         imm_i = inst >> 20
         if imm_i >= 0x800: imm_i -= 0x1000
-
-        # Extract and sign-extend S-type immediate
-        imm_s = ((inst >> 25) << 5) | ((inst >> 7) & 0x1F)
+        
+        # S-type
+        imm_s = ((inst >> 25) & 0x7F) << 5 | ((inst >> 7) & 0x1F)
         if imm_s >= 0x800: imm_s -= 0x1000
-
-        # Extract and sign-extend B-type immediate
-        imm_b = (((inst >> 31) & 1) << 12) | (((inst >> 7) & 1) << 11) | (((inst >> 25) & 0x3F) << 5) | (((inst >> 8) & 0xF) << 1)
+        
+        # B-type
+        imm_b = (((inst >> 31) & 0x1) << 12) | \
+                (((inst >> 7) & 0x1) << 11) | \
+                (((inst >> 25) & 0x3F) << 5) | \
+                (((inst >> 8) & 0xF) << 1)
         if imm_b >= 0x1000: imm_b -= 0x2000
-
-        # Extract and sign-extend J-type immediate
-        imm_j = (((inst >> 31) & 1) << 20) | (((inst >> 12) & 0xFF) << 12) | (((inst >> 20) & 1) << 11) | (((inst >> 21) & 0x3FF) << 1)
+        
+        # J-type
+        imm_j = (((inst >> 31) & 0x1) << 20) | \
+                (((inst >> 12) & 0xFF) << 12) | \
+                (((inst >> 20) & 0x1) << 11) | \
+                (((inst >> 21) & 0x3FF) << 1)
         if imm_j >= 0x100000: imm_j -= 0x200000
 
-        # Execute Instruction based on Opcode
         next_pc = pc + 4
         
-        if opcode == 0x33: # R-type (ADD, SUB, AND, OR, XOR, SLT)
-            if funct3 == 0:
-                if funct7 == 0x20: regs[rd] = regs[rs1] - regs[rs2] # SUB
-                else:              regs[rd] = regs[rs1] + regs[rs2] # ADD
-            elif funct3 == 0x7:    regs[rd] = regs[rs1] & regs[rs2] # AND
-            elif funct3 == 0x6:    regs[rd] = regs[rs1] | regs[rs2] # OR
-            elif funct3 == 0x4:    regs[rd] = regs[rs1] ^ regs[rs2] # XOR
-            elif funct3 == 0x2:    regs[rd] = 1 if to_signed(regs[rs1]) < to_signed(regs[rs2]) else 0 # SLT
-            
-        elif opcode == 0x13: # I-type ALU (ADDI, ANDI, ORI, SLTI)
-            if funct3 == 0:      regs[rd] = regs[rs1] + imm_i # ADDI
-            elif funct3 == 0x7:  regs[rd] = regs[rs1] & imm_i # ANDI
-            elif funct3 == 0x6:  regs[rd] = regs[rs1] | imm_i # ORI
-            elif funct3 == 0x2:  regs[rd] = 1 if to_signed(regs[rs1]) < imm_i else 0 # SLTI
-            
-        elif opcode == 0x03: # LW (Load Word)
+        # R-type instructions
+        if opcode == 0x33:
+            if funct3 == 0x0 and funct7 == 0x00:   # ADD
+                regs[rd] = regs[rs1] + regs[rs2]
+            elif funct3 == 0x0 and funct7 == 0x20: # SUB
+                regs[rd] = regs[rs1] - regs[rs2]
+            elif funct3 == 0x7 and funct7 == 0x00: # AND
+                regs[rd] = regs[rs1] & regs[rs2]
+            elif funct3 == 0x6 and funct7 == 0x00: # OR
+                regs[rd] = regs[rs1] | regs[rs2]
+            elif funct3 == 0x4 and funct7 == 0x00: # XOR
+                regs[rd] = regs[rs1] ^ regs[rs2]
+            elif funct3 == 0x2 and funct7 == 0x00: # SLT
+                regs[rd] = 1 if to_signed(regs[rs1]) < to_signed(regs[rs2]) else 0
+        
+        # I-type ALU instructions
+        elif opcode == 0x13:
+            if funct3 == 0x0:   # ADDI
+                regs[rd] = regs[rs1] + imm_i
+            elif funct3 == 0x7: # ANDI
+                regs[rd] = regs[rs1] & imm_i
+            elif funct3 == 0x6: # ORI
+                regs[rd] = regs[rs1] | imm_i
+            elif funct3 == 0x4: # XORI
+                regs[rd] = regs[rs1] ^ imm_i
+            elif funct3 == 0x2: # SLTI
+                regs[rd] = 1 if to_signed(regs[rs1]) < imm_i else 0
+                
+        # Load instruction (LW)
+        elif opcode == 0x03 and funct3 == 0x2:
             addr = regs[rs1] + imm_i
             regs[rd] = mem.get(addr, 0)
             
-        elif opcode == 0x23: # SW (Store Word)
+        # Store instruction (SW)
+        elif opcode == 0x23 and funct3 == 0x2:
             addr = regs[rs1] + imm_s
-            mem[addr] = regs[rs2]
+            mem[addr] = regs[rs2] & 0xFFFFFFFF
             
-        elif opcode == 0x63: # B-type Branches (BEQ, BNE)
-            val1 = to_signed(regs[rs1])
-            val2 = to_signed(regs[rs2])
-            if funct3 == 0x0 and val1 == val2: next_pc = pc + imm_b # BEQ
-            if funct3 == 0x1 and val1 != val2: next_pc = pc + imm_b # BNE
-            
-        elif opcode == 0x6F: # JAL (Jump and Link)
+        # Branch instructions
+        elif opcode == 0x63:
+            if funct3 == 0x0:   # BEQ
+                if regs[rs1] == regs[rs2]:
+                    next_pc = pc + imm_b
+            elif funct3 == 0x1: # BNE
+                if regs[rs1] != regs[rs2]:
+                    next_pc = pc + imm_b
+                    
+        # Jump instruction (JAL)
+        elif opcode == 0x6F:
             regs[rd] = pc + 4
             next_pc = pc + imm_j
 
-        # Keep register x0 locked to 0
+        # Lock register x0 to 0
         regs[0] = 0
         
-        # Limit register values to 32-bit unsigned bounds for display
+        # Mask registers to 32-bit unsigned bounds
         for i in range(32):
             regs[i] = regs[i] & 0xFFFFFFFF
             
         pc = next_pc
-        cycle += 1
-        
-    return regs, mem
+        instructions_executed += 1
 
-if __name__ == "__main__":
-    r, m = run_simulation("imem.hex")
-    print("Expected Register States from Python Model:")
-    for idx in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]:
-        print(f"x{idx} = {to_signed(r[idx])}")
+    return regs

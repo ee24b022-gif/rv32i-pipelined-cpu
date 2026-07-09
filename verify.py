@@ -5,7 +5,7 @@ import golden_model
 def run_rtl():
     print("Compiling and Running RTL simulation...")
     # Compile Verilog files
-    compile_cmd = "iverilog -o cpu_sim cpu.v pc.v imem.v regfile.v imm_gen.v control_unit.v alu_control.v alu.v dmem.v cpu_tb.v"
+    compile_cmd = "iverilog -o cpu_sim hazard_detection.v forwarding.v pipeline_regs.v cpu.v pc.v imem.v regfile.v imm_gen.v control_unit.v alu_control.v alu.v dmem.v cpu_tb.v"
     subprocess.run(compile_cmd.split(), check=True)
     
     # Run simulation and capture output
@@ -16,37 +16,44 @@ def main():
     # 1. Run RTL and get output
     rtl_out = run_rtl()
     
-    # 2. Parse RTL register values from the testbench log
-    rtl_regs = {}
+    # 2. Parse RTL register values from the dump block
+    rtl_regs = [0] * 32
+    in_dump = False
     for line in rtl_out.splitlines():
-        if line.startswith("x") and "=" in line:
+        if "--- REGISTER DUMP ---" in line:
+            in_dump = True
+            continue
+        if "--- MEMORY DUMP ---" in line:
+            in_dump = False
+        if in_dump and "=" in line:
             parts = line.split("=")
-            reg_name = parts[0].split("(")[0].strip() # Extract "x1" from "x1 (expect 10)"
-            reg_val = int(parts[1].split()[0])
-            rtl_regs[reg_name] = reg_val
-
-    # 3. Run Python simulation
-    py_regs, _ = golden_model.run_simulation("imem.hex")
-    
-    # 4. Compare
-    print("\nComparing RTL Registers vs Python Golden Model:")
-    failed = False
-    for idx in range(1, 15):
-        reg_name = f"x{idx}"
-        rtl_val = rtl_regs.get(reg_name, 0)
-        # Convert unsigned 32-bit register from python simulation to signed integer
-        py_val = golden_model.to_signed(py_regs[idx])
-        
-        match = "MATCH" if rtl_val == py_val else "MISMATCH"
-        print(f"Reg {reg_name:<3}: RTL = {rtl_val:<4} | Python = {py_val:<4} -> {match}")
-        if rtl_val != py_val:
-            failed = True
+            reg_idx = int(parts[0].replace("x", "").strip())
+            reg_val = int(parts[1].strip())
+            rtl_regs[reg_idx] = reg_val
             
-    if failed:
-        print("\nDIFF VERIFICATION: FAILED! ❌")
-        sys.exit(1)
+    # 3. Run Python Golden Model simulation
+    print("Running Python Golden Model...")
+    python_regs = golden_model.run_simulation("imem.hex")
+    
+    # 4. Perform Diff
+    print("\nComparing RTL Registers vs Python Golden Model:")
+    print("--------------------------------------------------")
+    mismatches = 0
+    for i in range(32):
+        rtl_val = rtl_regs[i]
+        py_val = python_regs[i]
+        match_str = "MATCH" if rtl_val == py_val else "MISMATCH ❌"
+        if rtl_val != py_val:
+            mismatches += 1
+        print(f"Reg x{i:02d}: RTL = {rtl_val:10d} | Python = {py_val:10d} -> {match_str}")
+        
+    print("--------------------------------------------------")
+    if mismatches == 0:
+        print("\nDIFF VERIFICATION: SUCCESS! ALL MATCH! 🎉")
+        sys.exit(0)
     else:
-        print("\nDIFF VERIFICATION: SUCCESS! ALL MATCH!  ")
+        print(f"\nDIFF VERIFICATION: FAILED! {mismatches} mismatches found. ❌")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
