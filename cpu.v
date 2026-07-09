@@ -11,6 +11,11 @@ module cpu (
     output wire out_reg_write
 );
 
+    // Hazard Detection wires
+    wire stall_F;
+    wire stall_D;
+    wire flush_E;
+
     // =========================================================================
     // 1. FETCH (IF) STAGE
     // =========================================================================
@@ -40,8 +45,8 @@ module cpu (
     
         if_id_reg if_id (
         .clk(clk), .rst(rst),
-        .stall_D(1'b0),          // Tied to 0 for now (no stall)
-        .flush_D(1'b0),          // Tied to 0 for now (no flush)
+        .stall_D(stall_D),       // Connect hazard stall
+        .flush_D(1'b0),          // Tied to 0 for now (no branch flush yet)
         .pc_in(pc_out), .inst_in(inst_F),
         .pc_out(pc_D), .inst_out(inst_D)
     );
@@ -100,7 +105,7 @@ module cpu (
 
         id_ex_reg id_ex (
         .clk(clk), .rst(rst),
-        .flush_E(1'b0),          // Tied to 0 for now (no flush)
+        .flush_E(flush_E),       // Connect hazard flush (inject bubble)
         .reg_write_in(reg_write_D), .mem_to_reg_in(mem_to_reg_D),
         .mem_read_in(mem_read_D), .mem_write_in(mem_write_D),
         .branch_in(branch_D), .jump_in(jump_D),
@@ -128,6 +133,11 @@ module cpu (
     wire [31:0] alu_result_E;
     wire zero_E;
     wire [31:0] branch_target_E;
+        // Forwarding Unit wires
+    wire [1:0] forward_a;
+    wire [1:0] forward_b;
+    reg [31:0] src_a_E;
+    reg [31:0] src_b_temp_E;
 
     alu_control alu_control_inst (
         .alu_op(alu_op_E),
@@ -137,11 +147,29 @@ module cpu (
         .alu_ctrl(alu_ctrl_E)
     );
 
-    // ALU Input B Multiplexer
-    assign alu_op_b_E = alu_src_E ? imm_ext_E : rdata2_E;
+        // ALU Input A Select (Forwarding Mux)
+    always @(*) begin
+        case (forward_a)
+            2'b01:   src_a_E = alu_result_M; // Forward from MEM stage
+            2'b10:   src_a_E = wdata_W;      // Forward from WB stage
+            default: src_a_E = rdata1_E;     // No hazard (use Register File)
+        endcase
+    end
 
-    alu alu_inst (
-        .a(rdata1_E),
+    // ALU Input B Select (Forwarding Mux)
+    always @(*) begin
+        case (forward_b)
+            2'b01:   src_b_temp_E = alu_result_M; // Forward from MEM stage
+            2'b10:   src_b_temp_E = wdata_W;      // Forward from WB stage
+            default: src_b_temp_E = rdata2_E;     // No hazard (use Register File)
+        endcase
+    end
+
+    // Choose between forwarded register data and immediate
+    assign alu_op_b_E = alu_src_E ? imm_ext_E : src_b_temp_E;
+
+        alu alu_inst (
+        .a(src_a_E),                         // Use forwarded source A
         .b(alu_op_b_E),
         .alu_ctrl(alu_ctrl_E),
         .result(alu_result_E),
@@ -155,7 +183,8 @@ module cpu (
     assign branch_taken_E = branch_E && ((funct3_E[0] == 1'b0 && zero_E) || (funct3_E[0] == 1'b1 && !zero_E));
 
     // PC Select Logic (routed back to IF stage)
-    assign pc_next = (jump_E || branch_taken_E) ? branch_target_E : pc_plus4_F;
+    assign pc_next = (jump_E || branch_taken_E) ? branch_target_E : 
+                     (stall_F ? pc_out : pc_plus4_F);
 
     // =========================================================================
     // EX/MEM Pipeline Register
@@ -172,7 +201,7 @@ module cpu (
         .mem_read_in(mem_read_E), .mem_write_in(mem_write_E),
         .branch_in(branch_E), .jump_in(jump_E),
         .pc_in(pc_E), .branch_target_in(branch_target_E),
-        .alu_result_in(alu_result_E), .zero_in(zero_E), .rdata2_in(rdata2_E),
+        .alu_result_in(alu_result_E), .zero_in(zero_E), .rdata2_in(src_b_temp_E),
         .rd_in(rd_E), .funct3_in(funct3_E),
         
         .reg_write_out(reg_write_M), .mem_to_reg_out(mem_to_reg_M),
@@ -230,5 +259,26 @@ module cpu (
     assign out_write_data = wdata_W;
     assign out_write_reg = rd_W;
     assign out_reg_write = reg_write_W;
+
+        forwarding forwarding_inst (
+        .rs1_E(rs1_E),
+        .rs2_E(rs2_E),
+        .rd_M(rd_M),
+        .reg_write_M(reg_write_M),
+        .rd_W(rd_W),
+        .reg_write_W(reg_write_W),
+        .forward_a(forward_a),
+        .forward_b(forward_b)
+    );
+
+        hazard_detection hazard_inst (
+        .rs1_D(inst_D[19:15]),
+        .rs2_D(inst_D[24:20]),
+        .rd_E(rd_E),
+        .mem_read_E(mem_read_E),
+        .stall_F(stall_F),
+        .stall_D(stall_D),
+        .flush_E(flush_E)
+    );
 
 endmodule
