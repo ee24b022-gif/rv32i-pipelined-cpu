@@ -55,7 +55,12 @@ hierarchy -top cpu
 synth -top cpu
 
 # 4. Write flattened pre-ABC netlist for loop-warning diagnosis
-#    See "Combinational Loop Warning" note in synth.tcl for context.
+#    This intermediate output captures the netlist BEFORE ABC technology mapping.
+#    Use it to inspect the specific nets that ABC flags with "Detected loop"
+#    warnings. Investigation has confirmed these are FALSE POSITIVES caused by
+#    net-name shadowing after hierarchy flattening — not real combinational
+#    feedback loops. See the "COMBINATIONAL LOOP WARNING INVESTIGATION" block
+#    at the bottom of synth.tcl for the full signal-path analysis.
 write_verilog -noattr flat_debug.v
 
 # 5. Map flip-flops to SKY130 DFF cells
