@@ -24,6 +24,8 @@ A portfolio-ready, synthesizable 32-bit RISC-V pipelined processor core implemen
 * [control_unit.v](control_unit.v) - Central opcode decoder.
 * [dmem.v](dmem.v) & [imem.v](imem.v) - RAM and ROM memory structures.
 * [verify.py](verify.py) & [golden_model.py](golden_model.py) - Co-simulation verification harness and ISA model.
+* [cpu_tb.v](cpu_tb.v) & [cpu_tb_cycle.v](cpu_tb_cycle.v) - End-of-program and cycle-accurate testbenches.
+* [tests/](tests/) - Directed test programs (.hex) covering forwarding, stalls, branches, memory, and ALU ops.
 * [synth.tcl](synth.tcl) - Yosys generic synthesis script (no timing, gate-count only).
 * [synth_timed.tcl](synth_timed.tcl) - Yosys timing-driven synthesis targeting SKY130 HD standard cells.
 * [run_sta.sh](run_sta.sh) - OpenSTA helper script for real Fmax analysis.
@@ -31,21 +33,48 @@ A portfolio-ready, synthesizable 32-bit RISC-V pipelined processor core implemen
 ---
 
 ## 🧪 Verification Methodology
-This core is verified using an automated **Python Co-Simulation Diff Harness**.
 
-## 🧪 Verification Methodology
-This core is verified using an automated Python Co-Simulation Diff Harness. 
+This core is verified using an automated **Python Co-Simulation Diff Harness** that compares RTL register state against a Python golden ISA model.
 
- [ Assembly Hex ] ──┬──► [ Python Golden ISA Model ] ──► [ Py Register Log ]
-                    │                                          │
-                    ▼                                          ▼
-             [ RTL Core (iverilog) ] ─────────────────► [ RTL Register Log ] ──► [ Diff Script ]
+```
+ [ Test Hex ] ──┬──► [ Python Golden ISA Model ] ──► [ Expected Registers ]
+                │                                          │
+                ▼                                          ▼
+         [ RTL Core (iverilog) ] ─────────────────► [ RTL Registers ] ──► [ Diff ]
+```
 
-1. **Self-Directed Tests**: Direct hazards tested on custom dependent sequences to confirm exact stalling and bypassing cycles.
-2. **Loop/Control Tests**: Loop program counting from 5 to 0 executed to verify control flushes, branch redirection, and register file writing.
-3. **Golden Model Comparisons**: The register logs from the Verilog gate-level state dump are compared side-by-side with the Python Golden Model output at execution termination.
+### Test Programs
 
-To run the automated verification suite:
+| Test | File | Coverage |
+|------|------|----------|
+| RAW Forwarding | `tests/test_raw_forwarding.hex` | EX→EX and MEM→EX forwarding, countdown loop |
+| Load-Use Stall | `tests/test_load_use.hex` | LW→dependent instruction stall, multiple patterns |
+| Branch & Jump | `tests/test_branch_jump.hex` | BEQ/BNE taken/not-taken, JAL, flush verification |
+| Store-Load | `tests/test_store_load.hex` | SW→LW same address, overwrite and re-read |
+| ALU Operations | `tests/test_alu_ops.hex` | All R-type and I-type ALU ops including negative numbers |
+
+### Running Verification
+
+```bash
+# Default: run the original test (end-of-program register diff)
+python3 verify.py
+
+# Run all directed tests
+python3 verify.py --all
+
+# Run a specific test
+python3 verify.py --test tests/test_load_use.hex
+
+# Cycle-accurate mode: diff registers every cycle (catches transient bugs)
+python3 verify.py --all --cycle-accurate
+
+# Custom cycle count
+python3 verify.py --all --cycle-accurate --num-cycles 80
+```
+
+**End-of-program mode** (default): Compares all 32 architectural registers at program termination. Fast, catches most bugs.
+
+**Cycle-accurate mode** (`--cycle-accurate`): Dumps and compares the register file every simulation cycle. Catches hazard bugs that produce incorrect intermediate values even if the final state is correct (e.g., a forwarding bug that self-corrects after a pipeline drain).
 
 
 ---

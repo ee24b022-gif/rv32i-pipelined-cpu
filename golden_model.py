@@ -122,3 +122,124 @@ def run_simulation(hex_file):
         instructions_executed += 1
 
     return regs
+
+
+def run_simulation_cycle_trace(hex_file):
+    """Run simulation and return a list of register snapshots after each instruction.
+
+    Returns:
+        list of list[int]: Each element is a 32-element list of register values
+        representing the architectural state after the corresponding instruction
+        committed (retired from the pipeline).
+
+    This is used for cycle-accurate verification. The caller must account for
+    pipeline latency when comparing against RTL cycle dumps (an instruction
+    entering IF at cycle N won't commit and update the regfile until cycle N+4
+    in steady state, or N+5 with a load-use stall).
+    """
+    regs = [0] * 32
+    mem = {}
+    snapshots = []
+
+    with open(hex_file, "r") as f:
+        instructions = [line.strip() for line in f if line.strip()]
+
+    pc = 0
+    instructions_executed = 0
+    limit = 1000
+
+    while pc // 4 < len(instructions) and instructions_executed < limit:
+        hex_inst = instructions[pc // 4]
+        inst = int(hex_inst, 16)
+
+        # NOP
+        if inst == 0:
+            snapshots.append([r & 0xFFFFFFFF for r in regs])
+            pc += 4
+            instructions_executed += 1
+            continue
+
+        opcode = inst & 0x7F
+        rd = (inst >> 7) & 0x1F
+        funct3 = (inst >> 12) & 0x07
+        rs1 = (inst >> 15) & 0x1F
+        rs2 = (inst >> 20) & 0x1F
+        funct7 = (inst >> 25) & 0x7F
+
+        # Decode Immediates
+        imm_i = inst >> 20
+        if imm_i >= 0x800: imm_i -= 0x1000
+
+        imm_s = ((inst >> 25) & 0x7F) << 5 | ((inst >> 7) & 0x1F)
+        if imm_s >= 0x800: imm_s -= 0x1000
+
+        imm_b = (((inst >> 31) & 0x1) << 12) | \
+                (((inst >> 7) & 0x1) << 11) | \
+                (((inst >> 25) & 0x3F) << 5) | \
+                (((inst >> 8) & 0xF) << 1)
+        if imm_b >= 0x1000: imm_b -= 0x2000
+
+        imm_j = (((inst >> 31) & 0x1) << 20) | \
+                (((inst >> 12) & 0xFF) << 12) | \
+                (((inst >> 20) & 0x1) << 11) | \
+                (((inst >> 21) & 0x3FF) << 1)
+        if imm_j >= 0x100000: imm_j -= 0x200000
+
+        next_pc = pc + 4
+
+        # R-type
+        if opcode == 0x33:
+            if funct3 == 0x0 and funct7 == 0x00:
+                regs[rd] = regs[rs1] + regs[rs2]
+            elif funct3 == 0x0 and funct7 == 0x20:
+                regs[rd] = regs[rs1] - regs[rs2]
+            elif funct3 == 0x7 and funct7 == 0x00:
+                regs[rd] = regs[rs1] & regs[rs2]
+            elif funct3 == 0x6 and funct7 == 0x00:
+                regs[rd] = regs[rs1] | regs[rs2]
+            elif funct3 == 0x4 and funct7 == 0x00:
+                regs[rd] = regs[rs1] ^ regs[rs2]
+            elif funct3 == 0x2 and funct7 == 0x00:
+                regs[rd] = 1 if to_signed(regs[rs1]) < to_signed(regs[rs2]) else 0
+
+        elif opcode == 0x13:
+            if funct3 == 0x0:
+                regs[rd] = regs[rs1] + imm_i
+            elif funct3 == 0x7:
+                regs[rd] = regs[rs1] & imm_i
+            elif funct3 == 0x6:
+                regs[rd] = regs[rs1] | imm_i
+            elif funct3 == 0x4:
+                regs[rd] = regs[rs1] ^ imm_i
+            elif funct3 == 0x2:
+                regs[rd] = 1 if to_signed(regs[rs1]) < imm_i else 0
+
+        elif opcode == 0x03 and funct3 == 0x2:
+            addr = regs[rs1] + imm_i
+            regs[rd] = mem.get(addr, 0)
+
+        elif opcode == 0x23 and funct3 == 0x2:
+            addr = regs[rs1] + imm_s
+            mem[addr] = regs[rs2] & 0xFFFFFFFF
+
+        elif opcode == 0x63:
+            if funct3 == 0x0:
+                if regs[rs1] == regs[rs2]:
+                    next_pc = pc + imm_b
+            elif funct3 == 0x1:
+                if regs[rs1] != regs[rs2]:
+                    next_pc = pc + imm_b
+
+        elif opcode == 0x6F:
+            regs[rd] = pc + 4
+            next_pc = pc + imm_j
+
+        regs[0] = 0
+        for i in range(32):
+            regs[i] = regs[i] & 0xFFFFFFFF
+
+        snapshots.append(list(regs))
+        pc = next_pc
+        instructions_executed += 1
+
+    return snapshots
