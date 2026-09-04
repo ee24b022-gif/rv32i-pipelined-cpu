@@ -1,5 +1,18 @@
-# Yosys Synthesis Script (Day 10)
-# Compiles your Verilog RTL files and maps them to generic logic gates.
+# Yosys Generic Synthesis Script
+# ============================================================================
+# This script compiles the RV32I-Lite CPU RTL and maps it to Yosys's built-in
+# generic logic cells ($mux, $dff, $and, $or, etc.). It is useful for:
+#   - Verifying synthesizability (no latches, no unresolved references)
+#   - Getting a rough gate-count estimate
+#   - Checking for structural issues (the `check` pass)
+#
+# IMPORTANT: This script does NOT produce timing information. The cell counts
+# and "critical path" from this flow are in generic logic levels, NOT in
+# nanoseconds or picoseconds. There is no liberty file mapping here.
+#
+# For timing-driven synthesis against SKY130 standard cells with real area and
+# delay numbers, use:  yosys synth_timed.tcl
+# ============================================================================
 
 # 1. Read all input Verilog source files
 read_verilog pc.v
@@ -28,6 +41,7 @@ synth -top cpu
 clean
 
 # 6. Display statistics (area estimation, cell counts)
+#    NOTE: These are generic cell counts, not silicon area.
 stat
 
 # 7. Write out the gate-level netlist file
